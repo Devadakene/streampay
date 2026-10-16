@@ -61,6 +61,14 @@ pub enum StreamError {
     /// A treasury withdrawal exceeds the fees collected minus fees already
     /// withdrawn for that token.
     InsufficientTreasuryBalance = 17,
+    /// The agent is not authorized for delegated withdrawals on this stream.
+    AgentNotAuthorized = 18,
+    /// The agent authorization has expired.
+    AgentExpired = 19,
+    /// The delegated withdrawal exceeds the agent's cap for the current period.
+    CapExceededPeriod = 20,
+    /// The delegated withdrawal exceeds the agent's total cap for this stream.
+    CapExceededStream = 21,
 }
 
 impl StreamError {
@@ -85,6 +93,10 @@ impl StreamError {
         StreamError::NotGovernor,
         StreamError::NoPendingGovernor,
         StreamError::InsufficientTreasuryBalance,
+        StreamError::AgentNotAuthorized,
+        StreamError::AgentExpired,
+        StreamError::CapExceededPeriod,
+        StreamError::CapExceededStream,
     ];
 
     /// The stable numeric value carried across the contract boundary

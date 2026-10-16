@@ -228,6 +228,140 @@ fn probe(branch: Branch) -> Option<StreamError> {
                 &1,
             )))
         }
+        // ----------------------------------------------------- session keys
+        Branch::AuthorizeAgentMaxPeriodNonPositive => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            let now = f.env.ledger().timestamp();
+            Some(rejected!(f.client.mock_all_auths().try_authorize_agent(
+                &id,
+                &agent,
+                &0,
+                &DEPOSIT,
+                &DAY,
+                &(now + 5 * DAY),
+            )))
+        }
+        Branch::AuthorizeAgentMaxStreamNonPositive => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            let now = f.env.ledger().timestamp();
+            Some(rejected!(f.client.mock_all_auths().try_authorize_agent(
+                &id,
+                &agent,
+                &DEPOSIT,
+                &0,
+                &DAY,
+                &(now + 5 * DAY),
+            )))
+        }
+        Branch::AuthorizeAgentPeriodDurationZero => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            let now = f.env.ledger().timestamp();
+            Some(rejected!(f.client.mock_all_auths().try_authorize_agent(
+                &id,
+                &agent,
+                &DEPOSIT,
+                &DEPOSIT,
+                &0,
+                &(now + 5 * DAY),
+            )))
+        }
+        Branch::AuthorizeAgentExpiryInPast => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            let now = f.env.ledger().timestamp();
+            Some(rejected!(f.client.mock_all_auths().try_authorize_agent(
+                &id,
+                &agent,
+                &DEPOSIT,
+                &DEPOSIT,
+                &DAY,
+                &now,
+            )))
+        }
+        Branch::WithdrawDelegatedAgentNotAuthorized => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            f.advance_time(2 * DAY);
+            Some(rejected!(f
+                .client
+                .mock_all_auths()
+                .try_withdraw_delegated(&id, &agent, &100)))
+        }
+        Branch::WithdrawDelegatedAgentExpired => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            let now = f.env.ledger().timestamp();
+            f.client.mock_all_auths().authorize_agent(
+                &id,
+                &agent,
+                &DEPOSIT,
+                &DEPOSIT,
+                &DAY,
+                &(now + DAY),
+            );
+            f.advance_time(2 * DAY);
+            Some(rejected!(f
+                .client
+                .mock_all_auths()
+                .try_withdraw_delegated(&id, &agent, &100)))
+        }
+        Branch::WithdrawDelegatedCapExceededPeriod => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            let now = f.env.ledger().timestamp();
+            f.client.mock_all_auths().authorize_agent(
+                &id,
+                &agent,
+                &500,
+                &DEPOSIT,
+                &DAY,
+                &(now + 5 * DAY),
+            );
+            f.advance_time(3 * DAY);
+            Some(rejected!(f
+                .client
+                .mock_all_auths()
+                .try_withdraw_delegated(&id, &agent, &501)))
+        }
+        Branch::WithdrawDelegatedCapExceededStream => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            let now = f.env.ledger().timestamp();
+            f.client.mock_all_auths().authorize_agent(
+                &id,
+                &agent,
+                &DEPOSIT,
+                &500,
+                &DAY,
+                &(now + 5 * DAY),
+            );
+            f.advance_time(3 * DAY);
+            Some(rejected!(f
+                .client
+                .mock_all_auths()
+                .try_withdraw_delegated(&id, &agent, &501)))
+        }
+        Branch::RevokeAgentNotRecipient => {
+            let f = Fixture::setup_quiet();
+            let id = f.create_stream(DEPOSIT, DAY, 10 * DAY, false);
+            let agent = soroban_sdk::Address::generate(&f.env);
+            let stranger = soroban_sdk::Address::generate(&f.env);
+            Some(rejected!(f
+                .client
+                .mock_all_auths()
+                .try_revoke_agent(&id, &agent, &stranger)))
+        }
         // Invariant-protected: a stored stream always satisfies
         // `0 <= withdrawn <= streamed <= deposit <= i128::MAX`, so these
         // checked subtractions/addition can never cross an i128 boundary —
@@ -359,7 +493,11 @@ fn stream_error_variant_list_is_exhaustive() {
             | StreamError::FeeRateTooHigh
             | StreamError::NotGovernor
             | StreamError::NoPendingGovernor
-            | StreamError::InsufficientTreasuryBalance => StreamError::ALL.contains(&e),
+            | StreamError::InsufficientTreasuryBalance
+            | StreamError::AgentNotAuthorized
+            | StreamError::AgentExpired
+            | StreamError::CapExceededPeriod
+            | StreamError::CapExceededStream => StreamError::ALL.contains(&e),
         }
     }
 

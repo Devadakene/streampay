@@ -81,18 +81,35 @@ pub enum Branch {
     AcceptGovernorNoPending,
     /// `accept_governor`: the caller is not the nominated address.
     AcceptGovernorNotNominee,
-    /// `withdraw_treasury`: amount is zero or negative.
-    WithdrawTreasuryAmountNonPositive,
     /// `withdraw_treasury`: amount exceeds fees collected minus fees already
     /// withdrawn.
     WithdrawTreasuryExceedsBalance,
+    // ----------------------------------------------------------- session keys
+    /// `authorize_agent`: max_per_period is zero or negative.
+    AuthorizeAgentMaxPeriodNonPositive,
+    /// `authorize_agent`: max_per_stream is zero or negative.
+    AuthorizeAgentMaxStreamNonPositive,
+    /// `authorize_agent`: period_duration is zero.
+    AuthorizeAgentPeriodDurationZero,
+    /// `authorize_agent`: expires_at is not in the future.
+    AuthorizeAgentExpiryInPast,
+    /// `withdraw_delegated`: agent is not authorized or revoked.
+    WithdrawDelegatedAgentNotAuthorized,
+    /// `withdraw_delegated`: agent session authorization has expired.
+    WithdrawDelegatedAgentExpired,
+    /// `withdraw_delegated`: amount exceeds the agent's period cap.
+    WithdrawDelegatedCapExceededPeriod,
+    /// `withdraw_delegated`: amount exceeds the agent's stream cap.
+    WithdrawDelegatedCapExceededStream,
+    /// `revoke_agent`: caller is not the stream recipient.
+    RevokeAgentNotRecipient,
 }
 
 impl Branch {
     /// Every branch, in declaration order. The matrix test walks this list and
     /// the coverage test requires each [`StreamError`] variant to be produced by
     /// one of these (or retired).
-    pub const ALL: [Branch; 24] = [
+    pub const ALL: [Branch; 33] = [
         Branch::CreateDepositNonPositive,
         Branch::CreateStartTimeInPast,
         Branch::CreateInvalidTimeRange,
@@ -117,6 +134,15 @@ impl Branch {
         Branch::AcceptGovernorNotNominee,
         Branch::WithdrawTreasuryAmountNonPositive,
         Branch::WithdrawTreasuryExceedsBalance,
+        Branch::AuthorizeAgentMaxPeriodNonPositive,
+        Branch::AuthorizeAgentMaxStreamNonPositive,
+        Branch::AuthorizeAgentPeriodDurationZero,
+        Branch::AuthorizeAgentExpiryInPast,
+        Branch::WithdrawDelegatedAgentNotAuthorized,
+        Branch::WithdrawDelegatedAgentExpired,
+        Branch::WithdrawDelegatedCapExceededPeriod,
+        Branch::WithdrawDelegatedCapExceededStream,
+        Branch::RevokeAgentNotRecipient,
     ];
 
     /// The entrypoint(s) through which this branch can fire. Shared helpers
@@ -166,6 +192,15 @@ impl Branch {
             Branch::WithdrawTreasuryAmountNonPositive | Branch::WithdrawTreasuryExceedsBalance => {
                 &["withdraw_treasury"]
             }
+            Branch::AuthorizeAgentMaxPeriodNonPositive
+            | Branch::AuthorizeAgentMaxStreamNonPositive
+            | Branch::AuthorizeAgentPeriodDurationZero
+            | Branch::AuthorizeAgentExpiryInPast => &["authorize_agent"],
+            Branch::WithdrawDelegatedAgentNotAuthorized
+            | Branch::WithdrawDelegatedAgentExpired
+            | Branch::WithdrawDelegatedCapExceededPeriod
+            | Branch::WithdrawDelegatedCapExceededStream => &["withdraw_delegated"],
+            Branch::RevokeAgentNotRecipient => &["revoke_agent"],
         }
     }
 
@@ -199,6 +234,15 @@ impl Branch {
             Branch::AcceptGovernorNoPending => StreamError::NoPendingGovernor,
             Branch::WithdrawTreasuryAmountNonPositive => StreamError::ZeroAmount,
             Branch::WithdrawTreasuryExceedsBalance => StreamError::InsufficientTreasuryBalance,
+            Branch::AuthorizeAgentMaxPeriodNonPositive
+            | Branch::AuthorizeAgentMaxStreamNonPositive => StreamError::ZeroAmount,
+            Branch::AuthorizeAgentPeriodDurationZero => StreamError::InvalidTimeRange,
+            Branch::AuthorizeAgentExpiryInPast => StreamError::StartTimeInPast,
+            Branch::WithdrawDelegatedAgentNotAuthorized => StreamError::AgentNotAuthorized,
+            Branch::WithdrawDelegatedAgentExpired => StreamError::AgentExpired,
+            Branch::WithdrawDelegatedCapExceededPeriod => StreamError::CapExceededPeriod,
+            Branch::WithdrawDelegatedCapExceededStream => StreamError::CapExceededStream,
+            Branch::RevokeAgentNotRecipient => StreamError::NotAuthorized,
         }
     }
 
@@ -244,6 +288,33 @@ impl Branch {
             }
             Branch::WithdrawTreasuryExceedsBalance => {
                 "amount exceeds fees collected minus fees already withdrawn"
+            }
+            Branch::AuthorizeAgentMaxPeriodNonPositive => {
+                "max_per_period is zero or negative"
+            }
+            Branch::AuthorizeAgentMaxStreamNonPositive => {
+                "max_per_stream is zero or negative"
+            }
+            Branch::AuthorizeAgentPeriodDurationZero => {
+                "period_duration is zero"
+            }
+            Branch::AuthorizeAgentExpiryInPast => {
+                "expires_at is before or equal to current ledger timestamp"
+            }
+            Branch::WithdrawDelegatedAgentNotAuthorized => {
+                "agent is not authorized or revoked for this stream"
+            }
+            Branch::WithdrawDelegatedAgentExpired => {
+                "agent session key authorization has expired"
+            }
+            Branch::WithdrawDelegatedCapExceededPeriod => {
+                "withdrawal amount exceeds remaining period cap for agent"
+            }
+            Branch::WithdrawDelegatedCapExceededStream => {
+                "withdrawal amount exceeds remaining total stream cap for agent"
+            }
+            Branch::RevokeAgentNotRecipient => {
+                "caller revoking agent is not the stream recipient"
             }
         }
     }
